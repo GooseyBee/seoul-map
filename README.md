@@ -10,8 +10,8 @@
 - [x] OSM 데이터 확보: 클라우드 환경에서 OSM 서버가 차단되어 사용자가 Geofabrik 추출본(2026-10-03)을 직접 업로드
 - [x] A2 가로 초안 2종 렌더링: [`output/seoul_A2_subway_draft`](output/seoul_A2_subway_draft.png), [`output/seoul_A2_nosubway_draft`](output/seoul_A2_nosubway_draft.png) (각각 .svg/.png/.pdf)
 - [x] 한강·다리·산·한글 표기 자동 검수 (아래 "검수" 참고)
-- [ ] **사용자 검토 대기**: 지하철 있음/없음 중 선택, 색·라벨 피드백
-- [ ] 초안 승인 후 A1/A2 최종본 (SVG + PDF)
+- [x] 사용자 검토: **지하철 있는 버전으로 결정** (2026-10-05, 수정 요청 없음)
+- [x] 최종본: [`output/seoul_A1_subway.pdf`](output/seoul_A1_subway.pdf) (841×594mm), [`output/seoul_A2_subway.pdf`](output/seoul_A2_subway.pdf) (594×420mm), 각각 .svg와 4000px .png 미리보기 포함
 
 ## 실행 방법
 
@@ -88,6 +88,9 @@ land → green → water → roads-minor → roads-mid → roads-major → subwa
 | 녹지·물 | 겹치는 폴리곤을 먼저 합친 뒤 그림 | 북한산국립공원 안의 숲처럼 겹치는 면이 even-odd 채우기에서 서로 지워져 하얗게 비는 문제가 있었음 |
 | 라벨 겹침 | 구 이름 → 랜드마크 순으로 상자 충돌 검사, 오른쪽/왼쪽/위/아래 중 빈 곳 선택 | 손으로 위치를 정하지 않고도 겹치지 않게. A1에서 크기가 바뀌어도 다시 계산됨 |
 | 산 표시 | 정상은 ▲, 북한산은 국립공원 면적의 서울 안쪽 중심에 라벨 | 백운대 정상은 고양시 쪽이라 서울 지도 밖에 찍힘. 관악산 정상은 과천 경계 위라 300m 여유를 둠 |
+
+| 최종 크기 | A1, A2 두 파일 따로 렌더링 | 벡터라 A1을 A2로 줄여 찍을 수도 있지만, 그러면 골목선이 0.07mm까지 얇아져 인쇄에서 사라질 수 있음. 크기별로 선·글자를 맞춰 따로 뽑음 |
+| 인쇄용 파일 | PDF (Pretendard 글꼴 내장) | 인쇄소에서 글꼴이 없어도 똑같이 나옴. PNG는 화면 미리보기용 |
 
 ### 팔레트
 

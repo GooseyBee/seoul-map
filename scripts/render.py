@@ -337,7 +337,7 @@ def main():
     (OUT / f"{stem}.svg").write_text(svg, encoding="utf-8")
     import cairosvg
     cairosvg.svg2png(bytestring=svg.encode(), write_to=str(OUT / f"{stem}.png"),
-                     output_width=2400 if a.draft else int(pg.w / 25.4 * 300))
+                     output_width=2400 if a.draft else 4000)  # preview only; print from the PDF/SVG
     cairosvg.svg2pdf(bytestring=svg.encode(), write_to=str(OUT / f"{stem}.pdf"))
     print(f"wrote output/{stem}.svg/.png/.pdf  (OSM {osm_date})")
     if missing:
