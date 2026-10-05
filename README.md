@@ -11,7 +11,9 @@
 - [x] A2 가로 초안 2종 렌더링: [`output/seoul_A2_subway_draft`](output/seoul_A2_subway_draft.png), [`output/seoul_A2_nosubway_draft`](output/seoul_A2_nosubway_draft.png) (각각 .svg/.png/.pdf)
 - [x] 한강·다리·산·한글 표기 자동 검수 (아래 "검수" 참고)
 - [x] 사용자 검토: **지하철 있는 버전으로 결정** (2026-10-05, 수정 요청 없음)
-- [x] 최종본: [`output/seoul_A1_subway.pdf`](output/seoul_A1_subway.pdf) (841×594mm), [`output/seoul_A2_subway.pdf`](output/seoul_A2_subway.pdf) (594×420mm), 각각 .svg와 4000px .png 미리보기 포함
+- [x] 1차 최종본 (아이콘 없음): [`output/seoul_A1_subway.pdf`](output/seoul_A1_subway.pdf) (841×594mm), [`output/seoul_A2_subway.pdf`](output/seoul_A2_subway.pdf) (594×420mm), 각각 .svg와 4000px .png 미리보기 포함
+- [x] 랜드마크 아이콘 초안 (A2): [`output/seoul_A2_subway_draft.png`](output/seoul_A2_subway_draft.png)
+- [ ] **사용자 검토 대기**: 아이콘 초안 승인 후 A1/A2 최종본 다시 뽑기
 
 ## 실행 방법
 
@@ -45,6 +47,7 @@ seoul-map/
 │   ├── build_gu.py       # 행정동 → 구 경계 합치기
 │   ├── extract_osm.py    # pbf에서 포스터용 레이어만 추출
 │   ├── render.py         # 레이어별 SVG + PNG + PDF
+│   ├── icons.py          # 랜드마크 아이콘 15종 (직접 그린 단순 도형)
 │   ├── check_accuracy.py # OSM 데이터를 공식 구 경계와 교차 검증
 │   └── build.sh          # 전체 파이프라인
 ├── data/
@@ -57,7 +60,7 @@ seoul-map/
 SVG 레이어 (Inkscape/Illustrator에서 레이어별로 따로 색을 바꿀 수 있음):
 
 ```
-land → green → water → roads-minor → roads-mid → roads-major → subway → gu-boundaries → labels-gu → labels-landmarks → footer
+land → green → water → roads-minor → roads-mid → roads-major → subway → gu-boundaries → labels-gu → landmark-icons → labels-landmarks → footer
 ```
 
 ## 설계 결정과 그 이유
@@ -90,6 +93,10 @@ land → green → water → roads-minor → roads-mid → roads-major → subwa
 | 산 표시 | 정상은 ▲, 북한산은 국립공원 면적의 서울 안쪽 중심에 라벨 | 백운대 정상은 고양시 쪽이라 서울 지도 밖에 찍힘. 관악산 정상은 과천 경계 위라 300m 여유를 둠 |
 
 | 최종 크기 | A1, A2 두 파일 모두 제공 | 선 굵기·글자가 종이 크기에 비례해서 두 파일은 같은 그림을 확대/축소한 것. 인쇄소에 맞는 크기 파일을 바로 보낼 수 있게 둘 다 뽑음 |
+| 랜드마크 표시 | 점 대신 작은 아이콘 (A2에서 높이 8.5mm) | 사용자 요청. 멀리서도 무엇인지 알아볼 수 있게 |
+| 아이콘 스타일 | 연보라 면 + 진보라 선, 둥근 모서리, 단순 도형 | "깔끔하고 살짝 귀여운" 톤과 팔레트 유지. 사진이나 남의 일러스트를 따라 그리지 않고 직접 만든 도형이라 저작권 걱정 없음 |
+| 아이콘 위치 | 아이콘 밑면 가운데가 OSM 좌표에 오게 | 아이콘이 그 자리에 "서 있는" 느낌. 라벨은 아이콘 옆 가운데 높이에 |
+| 아이콘 종류 | 궁궐 지붕, 남산 위 타워, 롯데타워 첨탑, 63빌딩, DDP 곡선, 서울역 돔, 나무(공원), 평화의문(올림픽공원), 풍력발전기(하늘공원), 유리 상자(코엑스), 비행기(김포), 산 | 각 장소의 대표 모양을 한눈에 떠올릴 수 있는 것으로 |
 | 인쇄용 파일 | PDF (Pretendard 글꼴 내장) | 인쇄소에서 글꼴이 없어도 똑같이 나옴. PNG는 화면 미리보기용 |
 
 ### 팔레트

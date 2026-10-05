@@ -15,6 +15,8 @@ from pyproj import Transformer
 from shapely.geometry import shape
 from shapely.ops import transform, unary_union, polylabel
 
+from icons import icon_svg
+
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data/processed"
 OUT = ROOT / "output"
@@ -37,6 +39,7 @@ C = {
     "ink":      "#46424F",
     "ink_soft": "#8A8594",
     "accent":   "#6E56AA",
+    "tint":     "#E4DCF5",
 }
 # stroke widths in mm at A2; scaled up with the page
 W = {"minor": 0.10, "mid": 0.26, "major": 0.50, "waterway": 0.30, "subway": 0.42,
@@ -257,9 +260,11 @@ def main():
             missing.append(label)
         else:
             found.append((label, side, kind, *pg.xy(pt.x, pt.y)))
-    for label, side, kind, x, y in found:          # marks are obstacles for every label
-        if kind != "area":
-            taken.append(shapely.box(x - k, y - k, x + k, y + k))
+    ico = 8.5 * k                                  # icon height on paper (mm)
+    for label, side, kind, x, y in found:          # icons are obstacles for every label
+        if kind == "area":
+            y += ico / 2                           # area labels: icon centred on the spot
+        taken.append(shapely.box(x - ico / 2, y - ico, x + ico / 2, y))
 
     gl = []
     for f, g in zip(gu_feats, gus):
@@ -278,29 +283,25 @@ def main():
                      font_size=f"{gu_fs:.2f}", fill=C["ink_soft"], text_anchor="middle",
                      letter_spacing=f"{0.25 * k:.2f}", dominant_baseline="middle"))
 
-    ll = []
-    gap = 1.6 * k
+    ll, icons = [], []
+    gap = 0.8 * k
     for label, side, kind, x, y in found:
         if kind == "area":
-            text = f"▲ {label}"
-            taken.append(tbox(x, y, text, 3.0 * k, "middle"))
-            ll.append(haloed(f'x="{x:.2f}" y="{y:.2f}" text-anchor="middle" font-size="{3.0 * k:.2f}"', text, k))
-            continue
-        opts = {"r": (x + gap, y, "start"), "l": (x - gap, y, "end"),
-                "t": (x, y - lm_fs * 1.2, "middle"), "b": (x, y + lm_fs * 1.2, "middle")}
+            y += ico / 2
+        icons.append(icon_svg(label, x, y, ico, C, 0.26 * k))
+        cy = y - ico / 2                           # labels line up with the icon's middle
+        half = ico / 2 + gap
+        opts = {"r": (x + half, cy, "start"), "l": (x - half, cy, "end"),
+                "t": (x, y - ico - lm_fs * 0.8, "middle"), "b": (x, y + lm_fs * 0.9, "middle")}
+        if side == "c":
+            side = "b"
         order = [side] + [o for o in "rltb" if o != side]
         best = min(order, key=lambda o: (sum(tbox(*opts[o][:2], label, lm_fs, opts[o][2]).intersection(t).area
                                              for t in taken), order.index(o)))
         tx, ty, anchor = opts[best]
         taken.append(tbox(tx, ty, label, lm_fs, anchor))
-        if kind == "peak":
-            r = 1.0 * k
-            mark = (f'<path d="M{x:.2f} {y - r:.2f}L{x + r:.2f} {y + r * 0.7:.2f}L{x - r:.2f} {y + r * 0.7:.2f}Z" '
-                    f'fill="{C["accent"]}" stroke="{C["land"]}" stroke-width="{0.3 * k:.2f}"/>')
-        else:
-            mark = (f'<circle cx="{x:.2f}" cy="{y:.2f}" r="{0.75 * k:.2f}" fill="{C["accent"]}" '
-                    f'stroke="{C["land"]}" stroke-width="{0.35 * k:.2f}"/>')
-        ll.append(mark + haloed(f'x="{tx:.2f}" y="{ty:.2f}" text-anchor="{anchor}"', label, k))
+        ll.append(haloed(f'x="{tx:.2f}" y="{ty:.2f}" text-anchor="{anchor}"', label, k))
+    out.append(layer("landmark-icons", "landmark icons", "\n".join(icons)))
     out.append(layer("labels-landmarks", "labels – landmarks", "\n".join(ll), font_family=FONT,
                      font_weight="500", font_size=f"{lm_fs:.2f}", fill=C["accent"],
                      dominant_baseline="middle"))
