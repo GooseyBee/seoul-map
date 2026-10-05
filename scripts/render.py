@@ -260,7 +260,7 @@ def main():
             missing.append(label)
         else:
             found.append((label, side, kind, *pg.xy(pt.x, pt.y)))
-    ico = 8.5 * k                                  # icon height on paper (mm)
+    ico = 10.0 * k                                 # icon height on paper (mm)
     for label, side, kind, x, y in found:          # icons are obstacles for every label
         if kind == "area":
             y += ico / 2                           # area labels: icon centred on the spot
@@ -288,7 +288,7 @@ def main():
     for label, side, kind, x, y in found:
         if kind == "area":
             y += ico / 2
-        icons.append(icon_svg(label, x, y, ico, C, 0.26 * k))
+        icons.append(icon_svg(label, x, y, ico, C, 0.17 * k))
         cy = y - ico / 2                           # labels line up with the icon's middle
         half = ico / 2 + gap
         opts = {"r": (x + half, cy, "start"), "l": (x - half, cy, "end"),
