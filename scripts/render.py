@@ -44,26 +44,52 @@ W = {"minor": 0.10, "mid": 0.26, "major": 0.50, "waterway": 0.30, "subway": 0.42
 
 FONT = "Pretendard, 'Noto Sans KR', sans-serif"
 
-# Landmarks: (label on poster, OSM names to look for in order, label side)
+# Landmarks: (label on poster, OSM names to look for in order, label side, kind)
+# kind "poi" = a building/park/attraction, "station" = railway station, "peak" = mountain
+# top (drawn with a small triangle), "area" = label the named OSM area clipped to Seoul.
 # Positions always come from OSM data; nothing here is a hand-typed coordinate.
 LANDMARKS = [
-    ("경복궁",          ["경복궁"], "r"),
-    ("N서울타워",       ["N서울타워", "남산서울타워"], "r"),
-    ("롯데월드타워",    ["롯데월드타워"], "r"),
-    ("63스퀘어",        ["63스퀘어", "63빌딩"], "l"),
-    ("동대문디자인플라자", ["동대문디자인플라자"], "r"),
-    ("서울역",          ["서울역"], "l"),
-    ("서울숲",          ["서울숲"], "r"),
-    ("올림픽공원",      ["올림픽공원"], "r"),
-    ("여의도공원",      ["여의도공원"], "r"),
-    ("하늘공원",        ["하늘공원"], "l"),
-    ("코엑스",          ["코엑스"], "r"),
-    ("김포국제공항",    ["김포국제공항"], "r"),
-    ("북한산",          ["백운대", "북한산"], "r"),
-    ("관악산",          ["연주대", "관악산"], "r"),
-    ("도봉산",          ["자운봉", "도봉산"], "r"),
-    ("남산",            [], "l"),  # covered by N서울타워; kept out to avoid a double label
+    ("경복궁",          ["경복궁"], "r", "poi"),
+    ("N서울타워",       ["N서울타워", "남산서울타워"], "r", "poi"),
+    ("롯데월드타워",    ["롯데월드타워"], "r", "poi"),
+    ("63스퀘어",        ["63스퀘어", "63빌딩"], "l", "poi"),
+    ("동대문디자인플라자", ["동대문디자인플라자"], "r", "poi"),
+    ("서울역",          ["서울역"], "l", "station"),
+    ("서울숲",          ["서울숲"], "r", "poi"),
+    ("올림픽공원",      ["올림픽공원"], "r", "poi"),
+    ("여의도공원",      ["여의도공원"], "l", "poi"),
+    ("하늘공원",        ["하늘공원"], "l", "poi"),
+    ("코엑스",          ["코엑스"], "r", "poi"),
+    ("김포국제공항",    ["김포국제공항"], "r", "poi"),
+    ("북한산",          ["북한산국립공원"], "c", "area"),
+    ("관악산",          ["관악산", "연주대"], "r", "peak"),
+    ("도봉산",          ["도봉산자운봉"], "r", "peak"),
 ]
+# OSM tags that mark a same-named feature as transport or a shop rather than the landmark
+# itself (e.g. 경복궁 is also a subway station, many bus stops and a restaurant).
+NOT_POI = ("railway=", "public_transport=", "highway=", "amenity=", "shop=")
+
+
+def pick(places, names, kind, seoul):
+    for n in names:
+        cands = []
+        for f in places:
+            p = f["properties"]
+            if p["name"] != n:
+                continue
+            pt = transform(to5179, shape(f["geometry"]))
+            # summits often sit exactly on the city line (관악산 is shared with 과천), so allow 300 m
+            if not seoul.buffer(300 if kind == "peak" else 0).contains(pt):
+                continue
+            ok = {"station": p["kind"] == "railway=station",
+                  "peak": p["kind"] == "natural=peak",
+                  "poi": bool(p["kind"]) and not p["kind"].startswith(NOT_POI)}[kind]
+            if ok:
+                cands.append((p.get("area_deg2", 0), pt))
+        if cands:
+            return max(cands, key=lambda c: c[0])[1]  # biggest area wins (the real park, not a namesake)
+    return None
+
 
 to5179 = Transformer.from_crs("EPSG:4326", "EPSG:5179", always_xy=True).transform
 
@@ -123,6 +149,19 @@ def clip(geoms, seoul, tol):
     return shapely.GeometryCollection(list(arr))
 
 
+def clip_areas(geoms, seoul, tol, min_area):
+    """Union overlapping polygons first (a forest inside a national park must not cancel
+    out under even-odd filling), then clip and drop specks too small to see on paper."""
+    if not geoms:
+        return shapely.GeometryCollection()
+    g = unary_union(shapely.make_valid(geoms)).intersection(seoul)
+    g = shapely.simplify(g, tol)
+    polys = [p for p in getattr(g, "geoms", [g]) if p.geom_type == "Polygon" and p.area >= min_area]
+    polys += [q for p in getattr(g, "geoms", [g]) if p.geom_type == "MultiPolygon"
+              for q in p.geoms if q.area >= min_area]
+    return shapely.MultiPolygon(polys)
+
+
 def layer(lid, label, body, **style):
     attrs = " ".join(f'{k.replace("_", "-")}="{v}"' for k, v in style.items())
     return (f'<g id="{lid}" inkscape:groupmode="layer" inkscape:label="{label}" {attrs}>\n'
@@ -160,11 +199,12 @@ def main():
     out.append(f'<rect width="{pg.w}" height="{pg.h}" fill="{C["paper"]}"/>')
     out.append(layer("land", "land", f'<path d="{pg.path(seoul)}"/>', fill=C["land"]))
 
-    green = clip(project(load("osm_green.geojson")), seoul, tol)
+    speck = (0.6 / pg.s) ** 2      # anything under ~0.6 x 0.6 mm on paper is noise
+    green = clip_areas(project(load("osm_green.geojson")), seoul, tol, speck)
     out.append(layer("green", "green (parks, mountains)", f'<path d="{pg.path(green)}"/>',
-                     fill=C["green"], fill_rule="evenodd"))
+                     fill=C["green"], fill_rule="evenodd"))  # safe now: polygons are unioned
 
-    water = clip(project(load("osm_water.geojson")), seoul, tol)
+    water = clip_areas(project(load("osm_water.geojson")), seoul, tol, speck)
     waterway = clip(project([f for f in load("osm_waterway.geojson")
                              if f["properties"]["waterway"] in ("river", "canal", "stream")]), seoul, tol)
     out.append(layer("water", "water",
@@ -191,33 +231,78 @@ def main():
                      f'stroke-width="{W["outline"] * k:.3f}" stroke-linejoin="round"/>'))
 
     # ---- labels ---------------------------------------------------------------
+    # Labels avoid each other with a simple greedy check on paper-space boxes:
+    # district names go down first, then each landmark tries right / left / above / below.
+    gu_fs, lm_fs = 3.6 * k, 2.5 * k
+    taken = []
+
+    def tbox(x, y, text, fs, anchor):
+        w = len(text) * fs * 0.98 + 0.4 * k          # Hangul glyphs are ~1 em wide
+        x0 = {"start": x, "end": x - w, "middle": x - w / 2}[anchor]
+        return shapely.box(x0, y - fs * 0.6, x0 + w, y + fs * 0.6)
+
+    places = load("osm_places.geojson")
+    greens = load("osm_green.geojson")
+    found, missing = [], []
+    for label, names, side, kind in LANDMARKS:
+        if kind == "area":
+            polys = [transform(to5179, shape(f["geometry"])) for f in greens
+                     if f["properties"]["name"] in names]
+            g = unary_union(polys).intersection(seoul) if polys else None
+            pt = polylabel(max(getattr(g, "geoms", [g]), key=lambda x: x.area), tolerance=20) \
+                if g is not None and not g.is_empty else None
+        else:
+            pt = pick(places, names, kind, seoul)
+        if pt is None:
+            missing.append(label)
+        else:
+            found.append((label, side, kind, *pg.xy(pt.x, pt.y)))
+    for label, side, kind, x, y in found:          # marks are obstacles for every label
+        if kind != "area":
+            taken.append(shapely.box(x - k, y - k, x + k, y + k))
+
     gl = []
     for f, g in zip(gu_feats, gus):
         p = polylabel(max(getattr(g, "geoms", [g]), key=lambda x: x.area), tolerance=20)
         x, y = pg.xy(p.x, p.y)
-        gl.append(haloed(f'x="{x:.2f}" y="{y:.2f}"', f["properties"]["name"], k))
+        name = f["properties"]["name"]
+        # nudge a district name up or down if a landmark mark sits under it
+        for dy in (0, gu_fs * 1.3, -gu_fs * 1.3, gu_fs * 2.6, -gu_fs * 2.6):
+            bx = tbox(x, y + dy, name, gu_fs, "middle")
+            if not any(bx.intersects(t) for t in taken):
+                break
+        y += dy
+        taken.append(bx)
+        gl.append(haloed(f'x="{x:.2f}" y="{y:.2f}"', name, k))
     out.append(layer("labels-gu", "labels – districts", "\n".join(gl), font_family=FONT, font_weight="600",
-                     font_size=f"{3.4 * k:.2f}", fill=C["ink_soft"], text_anchor="middle",
+                     font_size=f"{gu_fs:.2f}", fill=C["ink_soft"], text_anchor="middle",
                      letter_spacing=f"{0.25 * k:.2f}", dominant_baseline="middle"))
 
-    places = load("osm_places.geojson")
-    ll, missing = [], []
-    for label, names, side in LANDMARKS:
-        if not names:
+    ll = []
+    gap = 1.6 * k
+    for label, side, kind, x, y in found:
+        if kind == "area":
+            text = f"▲ {label}"
+            taken.append(tbox(x, y, text, 3.0 * k, "middle"))
+            ll.append(haloed(f'x="{x:.2f}" y="{y:.2f}" text-anchor="middle" font-size="{3.0 * k:.2f}"', text, k))
             continue
-        hit = next((f for n in names for f in places if f["properties"]["name"] == n), None)
-        if hit is None:
-            missing.append(label)
-            continue
-        pt = transform(to5179, shape(hit["geometry"]))
-        x, y = pg.xy(pt.x, pt.y)
-        dx = (1.6 if side == "r" else -1.6) * k
-        anchor = "start" if side == "r" else "end"
-        ll.append(f'<circle cx="{x:.2f}" cy="{y:.2f}" r="{0.75 * k:.2f}" fill="{C["accent"]}" '
-                  f'stroke="{C["land"]}" stroke-width="{0.35 * k:.2f}"/>'
-                  + haloed(f'x="{x + dx:.2f}" y="{y:.2f}" text-anchor="{anchor}"', label, k))
+        opts = {"r": (x + gap, y, "start"), "l": (x - gap, y, "end"),
+                "t": (x, y - lm_fs * 1.2, "middle"), "b": (x, y + lm_fs * 1.2, "middle")}
+        order = [side] + [o for o in "rltb" if o != side]
+        best = min(order, key=lambda o: (sum(tbox(*opts[o][:2], label, lm_fs, opts[o][2]).intersection(t).area
+                                             for t in taken), order.index(o)))
+        tx, ty, anchor = opts[best]
+        taken.append(tbox(tx, ty, label, lm_fs, anchor))
+        if kind == "peak":
+            r = 1.0 * k
+            mark = (f'<path d="M{x:.2f} {y - r:.2f}L{x + r:.2f} {y + r * 0.7:.2f}L{x - r:.2f} {y + r * 0.7:.2f}Z" '
+                    f'fill="{C["accent"]}" stroke="{C["land"]}" stroke-width="{0.3 * k:.2f}"/>')
+        else:
+            mark = (f'<circle cx="{x:.2f}" cy="{y:.2f}" r="{0.75 * k:.2f}" fill="{C["accent"]}" '
+                    f'stroke="{C["land"]}" stroke-width="{0.35 * k:.2f}"/>')
+        ll.append(mark + haloed(f'x="{tx:.2f}" y="{ty:.2f}" text-anchor="{anchor}"', label, k))
     out.append(layer("labels-landmarks", "labels – landmarks", "\n".join(ll), font_family=FONT,
-                     font_weight="500", font_size=f"{2.5 * k:.2f}", fill=C["accent"],
+                     font_weight="500", font_size=f"{lm_fs:.2f}", fill=C["accent"],
                      dominant_baseline="middle"))
 
     # ---- footer ---------------------------------------------------------------

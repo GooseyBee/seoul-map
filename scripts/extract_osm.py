@@ -46,6 +46,7 @@ LANDMARK_NAMES = {
     "북한산", "백운대", "관악산", "연주대", "도봉산", "자운봉", "인왕산", "남산", "목멱산",
     "북한산국립공원", "아차산", "수락산", "불암산", "청계산", "남산공원", "어린이대공원",
     "서울대공원", "보라매공원", "노들섬", "선유도공원", "밤섬", "북촌한옥마을", "숭례문", "흥인지문",
+    "북한산(백운대)", "도봉산자운봉", "보현봉", "문수봉",
 }
 
 wkbf = osmium.geom.WKBFactory()
@@ -67,7 +68,7 @@ def main(pbf):
           .with_areas()
           .with_filter(osmium.filter.KeyFilter(
               "highway", "waterway", "natural", "landuse", "leisure", "railway",
-              "boundary", "name", "water")))
+              "boundary", "name", "water")))  # "name" lets named landmarks (any tag) through
 
     for obj in fp:
         t = obj.tags
@@ -98,7 +99,8 @@ def main(pbf):
                     add("green", geom, {"name": name, "kind": _kind(t)})
                 if name in LANDMARK_NAMES:
                     add("places", geom.representative_point(),
-                        {"name": name, "kind": _kind(t), "osm": f"a{obj.id}"})
+                        {"name": name, "kind": _kind(t), "osm": f"a{obj.id}",
+                         "area_deg2": geom.area})
         except (RuntimeError, ValueError):
             # broken geometry in the source (e.g. an unclosed multipolygon): skip it
             continue
@@ -122,7 +124,8 @@ def _line(way):
 
 
 def _kind(t):
-    for k in ("tourism", "historic", "natural", "leisure", "building", "railway", "aeroway", "boundary"):
+    for k in ("tourism", "historic", "natural", "leisure", "building", "railway", "aeroway", "boundary",
+              "public_transport", "highway", "amenity", "shop", "landuse"):
         if k in t:
             return f"{k}={t[k]}"
     return ""
