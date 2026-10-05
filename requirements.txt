@@ -1,0 +1,4 @@
+shapely>=2.0
+pyproj>=3.6
+osmium>=4.0
+cairosvg>=2.7
